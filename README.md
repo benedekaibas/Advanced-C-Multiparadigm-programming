@@ -2,7 +2,7 @@
 
 📚 This repository contains notes, references, and personal experiments based on the **Advanced C++ (Multiparadigm) Programming** course taught by **Dr. Zoltán Porkoláb** at ELTE.
 
-> ⚠️ **Disclaimer**: All lecture materials, videos, and course content are the intellectual property of **Dr. Zoltán Porkoláb**. This repository is only a personal learning archive. I do not claim ownership over any of the original material.
+> ⚠️ **Disclaimer**: All lecture materials, videos, and course content are the intellectual property of **Dr. Zoltán Porkoláb**. This repository is only a personal learning archive. I do not claim ownership over any of the original material. You can find all the course materials on Professor Porkoláb's website.
 
 ---
 
