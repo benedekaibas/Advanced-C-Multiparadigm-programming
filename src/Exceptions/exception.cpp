@@ -235,6 +235,7 @@ in the static memory space.
 */
 
 
+
 // HOW DOES HANDLING WORKS
 
 /*
@@ -244,3 +245,253 @@ A handler of type H catches the exception of type E if:
     H and E are pointers or references and some of the above
     stands
 */
+
+// EXCEPTION HIERARCHIES
+
+class Base { … };
+class Der1 : public Base { … };
+class Der2 : public Base { … };
+class Der3 : public Der2 { … };
+try
+{
+    f();
+// …
+}
+catch (Der3 &e1) { /* handler for Der3 */ } /* the most derived handler first */
+catch (Der2 &e2) { /* handler for Der2 */ }
+catch (Der1 &e3) { /* handler for Der1 */ }
+catch (Base &e3) { /* handler for Base */ } /* the base handler last */
+void f()
+{
+    if ( ... )
+        throw Der3(); /* throw the most derived type */
+}
+
+/*
+We should pay attention to how to catch the created object (because the stack works in a LIFO system) we have to do the catch in a
+reverse system.
+
+Imagine that we throw the base handler first then we won't be able to get access to the other handlers, so they would not get to work
+meaning we won't use them. If we throw Der3 handler first than we can get to every handler and at the end for the base class handler.
+
+Also pay attention that the objects in the catches are called with reference. This is for getting access to the object that is created in the
+static memory space, so we avoid memory overhead.
+*/
+
+
+
+// EXCEPTION HIERARCHIES - 2
+
+class net_error { ... };
+class file_error { ... };
+class nfs_error : public net_error, public file_error { ... };
+void f()
+{
+    try
+{
+    …
+}
+    catch( nfs_error nfs ) { ... }
+    catch( file_error fe ) { ... }
+    catch( net_error ne ) { ... }
+}
+
+/*
+Doing inheritance -or multiple inheritance- with exceptions is possible and sometimes even beneficial. If I want to catch a bug with handler a and handler b
+then it can be very useful to do inheritance (Network Filesystems, for example). In network filesystem we can catch filesystem errors and networks errors with
+different handlers. In case of inheritance it can be a very useful approach.
+*/
+
+
+
+// RE-THROW
+
+class Base { … };
+class Der1 : public Base { … };
+void g()
+{
+    throw Der1; // throw derived exception Der1
+}
+void f()
+try // function block itself can be try block
+{
+    g();
+}
+catch ( Base b ) // catch Base by value: copied, since C++11 can be moved
+{
+    must_do_at_exception(b);
+    throw; // re-throw original exception Der1
+}
+catch ( ... ) // catch all
+{
+    must_do_at_exception();
+    throw; // re-throw original exception
+}
+
+/*
+Re-throw can be useful when a handler cannot handle the given job so it throws it to another handler in a higher hierarchy that will do the handling.
+Also if a handle only can solve a part of it then it is possible to throw it, so another handler can solve the rest of the job (it has to work with)
+the original object and not the sliced one! In this case it is important to note that we must re-throw the original object, and not the sliced one.
+
+Re-throw happens in the catch phase and we know if it's a re-throw if the throw does not have any parameters, so we will throw the object that evoke the
+original exception.
+
+In the code above when we do the re-throw we do not throw the Base b. The der1 will be copied into the static memory location which is the base class, so
+we will throw the copy that is stored in the static memory location. If we would say throw(b) then we would throw the original object and not the copied version
+that is located in the static memory. THIS IS AN IMPORTANT PART OF RE-THROWING!
+
+(...) -> this is an universal handler which catches "everything". This is the most general handler. If we have this handler then we must write it as the lowest handler
+and of course it should not be at the top of the hierarchy. In this case always think of the "szita efektus".
+*/
+
+
+
+// EXCEPTION HIERARCHIES - 3 | WHY IS IT USEFUL TO CREATE EXCEPTION HIERARCHIES?
+
+#include <stdexcept>
+
+struct matrixError // perhaps member in class Matrix
+{
+    matrixError(std::string r) : reason(r) { }
+    std::string reason;
+    virtual ~matrixError() { } // we know that we will be working with inheritance, so we need a virtual destructor
+};
+
+struct indexError : public matrixError, public std::out_of_range
+{
+    indexError(int i, const char *r = "Bad index") : matrixError(r), out_of_range(r), index(i)
+    {
+        std::ostringstream os;
+        os << index;
+        reason += ", index = ";
+        reason += os.str();
+    }
+
+    const char *what() const noexcept override
+    {
+        return reason.c_str();
+    }
+
+    virtual ~indexError() { }
+    int index;
+};
+
+struct rowIndexError : public indexError
+{
+    rowIndexError(int i) : indexError(i, "Bad row index") { }
+};
+
+struct colIndexError : public indexError
+{
+    colIndexError(int i) : indexError(i, "Bad col index") { }
+};
+
+/*
+The main point of creating exception hierarchies is that we can express the bugs and handle them in the most sophisticated way.
+*/
+
+
+
+// STD EXCEPTION HIERARCHY
+
+class exception {}; // in <exception>
+
+class bad_exception : public exception {}; // calls unexpected()
+class bad_weak_ptr : public exception {}; // C++11 weak_ptr -> shared_ptr
+class bad_function_call : public exception {}; // C++11 function::operator()
+class bad_typeid : public exception {}; // typeid(0)
+class bad_cast : public exception {}; // dynamic_cast
+    class bad_any_cast : public bad_cast {}; // C++17
+class bad_variant_access : exception {} // C++17
+class bad_optional_access : exception {} // C++17
+class bad_alloc : public exception {}; // new <new>
+    class bad_array_new_length : bad_alloc {} // C++11, new T[-1]
+
+class logic_error : public exception {};
+    class domain_error : public logic_error {}; // domain error,std::sqrt(-1)
+    class invalid_argument : public logic_error {}; // bitset char != 0 or 1
+    class length_error : public logic_error {}; // length str.resize(-1)
+    class out_of_range : public logic_error {}; // bad index in container or string
+    class future_error : public logic_error {}; // C++11: promise abandons the shared state
+
+class runtime_error : public exception {};
+    class range_error : public runtime_error {}; // floating point ovf or unf
+    class overflow_error : public runtime_error {}; // int overflow INT_MAX+1
+    class underflow_error : public runtime_error {}; // int underflow INT_MIN-1
+    class system_error : public runtime_error {}; // e.g. std::thread constr.
+        class ios_base::failure : public system_error {}; // C++11
+        class filesystem::filesystem_error : public system_error {}; // C++17
+        class nonexistent_local_time : public system_error // C++20
+        class ambigous_local_time : public system_error // C++20
+        class format_error : public system_error // C++20
+
+
+
+// EXCEPTION SPECIFICATION BEFORE C++11
+
+class E1;
+class E2;
+
+void f() throw(E1) // throws only E1 or subclasses
+{
+    ...
+    throw E1(); // throws exception of type E1
+    ...
+    throw E2(); // calls unexpected() which calls terminate()
+}
+
+// same as:
+void f()
+try {
+    ...
+}
+catch(E1) { throw; }
+catch(...) { std::unexpected(); }
+
+/*
+The problem is that if f calls function c that calls another function that does exception handling. If this function throws exception that will go through
+function c and then in function f as well. The compiler cannot check it in C.
+
+That is the reason why in C++ the throw(E1) only can throw E1 or its subclasses, but not any other classes avoiding the problem we described above. If E1 comes
+we catch it and throw, but if anything else comes then we abort the code instantly.
+
+Since C++17 this got deleted from the standard.
+
+The code below is a more sophisticated way of throwing exception and we do not terminate the code:
+*/
+
+class E1;
+class E2;
+
+void f() throw(E1, std::bad_exception) // throws only E1 or subclasses
+{
+    ...
+    throw E1(); // throws exception of type E1
+    ...
+    throw E2(); // calls unexpected() which throws bad_exception()
+}
+
+typedef void (*terminate_handler)();
+terminate_handler set_terminate(terminate_handler);
+terminate_handler get_terminate(); // C++11
+
+// until C++17
+typedef void (*unexpected_handler)();
+unexpected_handler set_unexpected(unexpected_handler);
+unexpected_handler get_unexpected(); // C++11
+
+void f() throw() // does not throw, can be optimized
+// People using the f() function could assume that this function does not throw exception since the () after the throw is empty, so
+// they could optimize it. The problem is that during compilation time we cannot check it
+
+/*
+So here, instead of terminating the code we just include the std::bad_exception and then handle the exception.
+
+This got also removed from the standard since C++20
+
+Because all of the issues with these exception handling methods we got the noexcept in the standard.
+*/
+
+
+
+// NOEXCEPT SPECIFIER
