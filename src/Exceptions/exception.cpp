@@ -495,3 +495,7 @@ Because all of the issues with these exception handling methods we got the noexc
 
 
 // NOEXCEPT SPECIFIER
+
+void f() noexcept(expr) { }
+void f() noexcept(true) { }
+void f() noexcept { } // noexcept(true)
