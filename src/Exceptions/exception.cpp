@@ -496,6 +496,83 @@ Because all of the issues with these exception handling methods we got the noexc
 
 // NOEXCEPT SPECIFIER
 
-void f() noexcept(expr) { }
+void f() noexcept(expr) { } // the compiler will evaluate the parameter in compilation time
 void f() noexcept(true) { }
 void f() noexcept { } // noexcept(true)
+
+/*
+Noexcept is important for optimizations and code safety. C++ functions are either non-throwing or potentially throwing (we are not sure if they will throw, but potentially they can).
+C++ cannot execute full compile time check on possible exceptions due to possible call of non C++ functions.
+
+IMPORTANT: Destructors, deallocation functions are non-throwing, so it means we don't need to write noexcept for them.
+
+Based on how we declared the base class or function that the following expression call, they can be non-throwing as well: Implicitly declared or defaulted default-, copy- and move constructors,
+copy, move oper. So again, based on what base class or operators they are calling (if they call a noexcept base class for example) we do not need to describe them as noexcept.
+
+At move semantic, for example, using noexcept can lead to better performance.
+*/
+
+
+
+// NOEXCEPT OPERATOR
+
+template <typename T>
+//       this is the specifier   and this is the operator!!!
+void f() noexcept               (noexcept(T::g())) {
+    T::g();
+}
+
+/*
+In C++ there are noexcept specifier, and operator. In case of noexcept operator the noexcept has a parameter (T::g()). The parameter produces true or false values based on its argument is
+non-throwing or potentially throwing.
+
+The key difference between the noexcept operator and specifier: In the f() with a noexcept operator we aren't saying that this function never gives exception, but we rather say that this f()
+will throw or not throw exception based on what we know about function g().
+
+This is especially useful with templates when we do not know what type it will be instantiated with. We do not know that the type the template will be instantiated with will throw exception or not.
+
+*/
+
+// Basic example of output
+template <typename T>
+void f() noexcept(noexcept(T::g(5 + 2))) {
+    T::g();
+}
+
+// OUTPUT: True
+
+
+
+// DESTRUCTORS
+
+/*
+In C++ it is a very strong rule that destructors must not throw exceptions. It's not strictly in the standard library, so we can write destructors that throw exception and there are examples for that in real
+life as well, but we have to be careful with that. This article inspects this topic in more detail (https://akrzemi1.wordpress.com/2011/09/21/destructors-that-throw/).
+*/
+
+
+
+// EXCEPTION SAFETY
+
+class T1 {...};
+class T2 {...};
+
+template <typename T1, typename T2>
+void f(T1*, T2*);
+
+void g() {
+    f(new T1(), new T2());
+    // ...
+}
+
+/*
+Imagine that I have constructed T1, but T2 throws exception, because we couldn't allocate the memory in the heap of T2 or the constructor of T2 throws exception then C++ guarantees that the memory reserved by T2 will
+free, but the memory space of T1 won't free and then we get memory leak. Before C++17 it was also possible that the expressions got overlapped in the call. Both expression were before the sequence point, so it was possible
+before C++17 that the memory was allocated for T1 and then T2, but the constructor got called for T1 and then T2 and if there was an exception in any of the parameters then the memory allocated to the other parameter didn't free.
+
+This is the exception safety problem that's the reason why we have to carefully implement exceptions because there can happen memory leak and we lose the whole point of working with exceptions.
+*/
+
+
+
+// ENSURE EXCEPTION SAFETY
