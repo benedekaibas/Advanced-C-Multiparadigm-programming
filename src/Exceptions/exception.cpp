@@ -576,3 +576,72 @@ This is the exception safety problem that's the reason why we have to carefully 
 
 
 // ENSURE EXCEPTION SAFETY
+
+class T1 {...};
+
+class T2 {...};
+
+template <typename T1, typename T2>
+void f(std::unique_ptr<T1>, std::unique_ptr<T2>);
+
+void g() {
+    std::unique_ptr<T1> ptr1{ new T1() };
+    std::unique_ptr<T2> ptr2{ new T2() };
+    f(ptr1, ptr2);
+    // ...
+}
+
+/*
+By rearranging the source code and using sequence points we can make sure that exception safety is guaranteed.
+For example, using unique pointers and declare them differently (under each other, so there are sequance point between them) we can ensure exception safety.
+
+*/
+
+
+
+// EXCEPTION SAFETY IN STL
+
+/*
+In the stl there are there levels of exception safety described:
+    Basic guarantee: no memory leak or other resource issue
+    Strong guarantee: the operation is atomic:
+                    it either succeeds or has no effect
+        e.g. push_back() for vector, insert() for assoc. cont.
+    Nothrow guarantee: the operation does not throw
+        e.g. pop_back() for vector, erase() for assoc. cont., swap()
+
+It is possible that a push_back throws exception, but if it happens it's guaranteed that we keep the vectors old value before the push_back().
+
+In case of pop_back() it's guaranteed that it won't throw exception. That's the difference between nothrow guarantee and strong guarantee.
+*/
+
+
+
+// STRONG GUARANTEE EXAMPLE
+
+template <class T>
+class Vec
+{
+    // ...
+private:
+    size_t cap;
+    size_t sz;
+    T* v;
+};
+
+Vec<T>& Vec<T>::operator=(const Vec& rhs)
+{
+    if (this != &rhs)                          if (this != &rhs)
+    {                                          {
+        delete[] v;                              Vec tmp(rhs);
+        cap = sz = rhs.sz;                       cap = sz = tmp.sz;
+        v = new T[cap];                          std::swap(v, tmp.v);
+        for (size_t i = 0; i < cap; ++i)       }
+    v[i] = rhs.v[i];                           // tmp deleted here with the old buffer
+    }
+    return *this;                              return *this;
+}                                             }
+
+/*
+
+*/
