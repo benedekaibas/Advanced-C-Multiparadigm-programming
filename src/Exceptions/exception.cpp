@@ -643,5 +643,93 @@ Vec<T>& Vec<T>::operator=(const Vec& rhs)
 }                                             }
 
 /*
+On the right hand we create a temporal object - in this case a class called Vec. Here in the temporal object we do the copying and if this copying cannot allocate the memory
+or the elements in the buffer throws exception it's not a problem because the temporal object will be terminated. If the copying is successfull then we do operations that are
+are noexcept guaranteed, like swap. The problem with the copying on the right hand side is that for a moment we will allocate double of the memory, so it will result in memory overhead.
 
+That's the reason why not all the expressions are strong guaranteed, but only a few of those.
+*/
+
+
+
+// EXCEPTION PTR
+
+#include <iostream>
+#include <string>
+#include <exception>
+#include <stdexcept>
+
+void handle_eptr(std::exception_ptr eptr) // passing by value is ok
+{
+    try
+    {
+        if (eptr != std::exception_ptr())
+        {
+            std::rethrow_exception(eptr);
+        }
+    }
+    catch (const std::exception& e)
+    {
+        std::cout << "Caught exception \"" << e.what() << "\"\n";
+    }
+}
+
+int main()
+{
+    std::exception_ptr eptr;
+    try
+    {
+        std::string().at(1); // this generates an std::out_of_range
+    }
+    catch (...)
+    {
+        eptr = std::current_exception(); // capture
+    }
+
+    handle_eptr(eptr);
+} // destructor for std::out_of_range called here, when the eptr is destructed
+  // output: Caught exception "basic_string::at"
+
+
+
+// NESTED EXCEPTIONS
+
+void print_exception(const std::exception& e, int level = 0) // prints the string of an exception.
+{   // if nested, recurses
+    std::cerr << std::string(level, ' ') << "exception: " << e.what() << '\n';
+    try {
+        std::rethrow_if_nested(e);
+    } catch(const std::exception& e) {
+        print_exception(e, level + 1);
+    } catch(...) {}
+}
+
+void open_file(const std::string& s) // catches an exception and wraps it in a nested exception
+{
+    try {
+        std::ifstream file(s);
+        file.exceptions(std::ios_base::failbit);
+    } catch(...) {
+        std::throw_with_nested(std::runtime_error("Couldn't open " + s));
+    }
+}
+
+void run() // sample function that catches an exception and wraps it in a nested exception
+{
+    try {
+        open_file("nonexistent.file");
+    } catch(...) {
+        std::throw_with_nested(std::runtime_error("run() failed"));
+    }
+}
+
+int main() // runs the sample function above and prints the caught exception
+try { // exception: run() failed
+    run(); // exception: Couldn't open nonexistent file
+} catch(const std::exception& e) { // exception: basic_ios::clear
+    print_exception(e);
+}
+
+/*
+It is possible that we find some nested exceptions in real life systems, but it's rare. Even though, it's just good to know about them.
 */
