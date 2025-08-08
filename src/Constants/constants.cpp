@@ -10,3 +10,23 @@ The goals of C++ described by Stroustrup:
     Readability
     Learnability
 */
+
+
+
+// MAPPING SEMANTIC ISSUE TO SYNTAX
+
+/* C language I/O */
+#include <stdio.h>
+
+int main()
+{
+    FILE *fp = fopen("input.txt", "r");
+    . . .
+    fprintf(fp, "%s\n", "Hello input!");
+    return 0; /* not strictly necessary since C99 */
+}
+
+/*
+In C we would get a runtime error since we open the file in reading mode, but we want to write on it.
+In C++ it would be a compiler error since as we know the ifstream does not have insertion operator.
+*/
